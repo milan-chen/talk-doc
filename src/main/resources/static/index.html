@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/favicon_s.ico" type="image/x-icon">
+    <title>Talk Doc</title>
+    <meta name="viewport"
+          content="width=device-width,height=device-height, user-scalable=no,initial-scale=1, minimum-scale=1, maximum-scale=1,target-densitydpi=device-dpi ">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@2.51.3/dist/full.css" rel="stylesheet" type="text/css"/>
+    <link href="//netdna.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-image: url('/background.jpg');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-position: center;
+        }
+
+        .title-text {
+            color: #8A2BE2;
+        }
+
+        .chat-window {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            width: 100%;
+        }
+
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            max-width: 80%;
+        }
+
+        .message.user {
+            background-color: #007bff;
+            color: white;
+            text-align: left;
+            align-self: flex-end;
+            border-radius: 18px 18px 0 18px;
+        }
+
+        .message.ai {
+            background-color: white;
+            color: black;
+            text-align: left;
+            align-self: flex-start;
+            border-radius: 18px 18px 18px 0;
+        }
+
+        .message.ai a {
+            color: #1a0dab;
+            text-decoration: none;
+        }
+
+        .message.ai a:hover {
+            color: #FF0000;
+            text-decoration: underline;
+        }
+
+        .input-area {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .input-area .input {
+            flex-grow: 1;
+        }
+
+        .input-area .btn {
+            width: 100px;
+        }
+
+        .icon {
+            margin-right: 3px;
+        }
+
+        .fixed-text-area {
+            color: #808080;
+            font-size: 1em;
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+<div class="container mb-10">
+    <div class="flex flex-col items-center h-screen w-screen">
+        <div class="flex flex-col items-center justify-center">
+            <h1 class="text-5xl font-bold mt-20 mb-10 title-text"></h1>
+        </div>
+        <div class="chat-window overflow-auto px-3 py-2 rounded-lg w-2/3 h-2/3 bg-gray-100 mb-3" id="chat-window">
+        </div>
+        <div class="input-area overflow-hidden w-2/3">
+            <button id="submit-reset" class="btn bg-gray-500 text-white flex items-center justify-center mr-2"
+                    title="清空对话记录">
+                <i class="fa fa-trash icon"></i>
+                <span>重置</span>
+            </button>
+            <button id="toggle-mode" class="btn bg-blue-500 text-white flex items-center justify-center mr-2"
+                    title="切换模式：专注文档内容对话｜自由对话">
+                <i class="fa fa-exchange icon"></i>
+                <span id="toggle-mode-text">专注</span>
+            </button>
+            <input id="search" type="text" placeholder="输入消息..."
+                   class="input input-bordered flex-grow mr-2"/>
+            <button id="submit-send" class="btn btn-primary flex items-center justify-center">
+                <i class="fa fa-paper-plane icon"></i>
+                <span>发送</span>
+                <span id="submit-text" style="display: none;"></span>
+                <svg id="loading" class="animate-spin h-2 w-2 ml-2 text-white" style="display: none;"
+                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
+            <label for="file-upload" class="btn btn-primary ml-2">
+                <i class="fa fa-upload icon"></i>
+                <span>文档</span>
+                <input id="file-upload" accept=".pdf, .doc, .docx, .txt, .md" type="file" style="display:none;">
+                <svg id="upload-loading" class="animate-spin h-2 w-2 ml-2 text-white" style="display: none;"
+                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </label>
+        </div>
+        <div class="fixed-text-area w-2/3 text-center py-2 mx-auto">
+            <p id="fixed-text">内容由 AI 大模型生成，请仔细甄别</p>
+        </div>
+    </div>
+</div>
+<script>
+
+    const resetButton = document.querySelector('#submit-reset');
+    const submitButton = document.querySelector('#submit-send');
+    const search = document.querySelector('#search');
+    const loading = document.querySelector('#loading');
+    const submitText = document.querySelector('#submit-text');
+    const chatWindow = document.querySelector('#chat-window');
+    const toggleModeButton = document.querySelector('#toggle-mode');
+    const toggleModeButtonText = document.querySelector('#toggle-mode-text');
+    const fileUploadButton = document.querySelector('label[for="file-upload"]');
+
+    // 设置聊天模式为 "focus"
+    let chatMode = "focus";
+
+    // 添加点击事件监听器，用于切换聊天模式
+    toggleModeButton.addEventListener('click', () => {
+        if (toggleModeButtonText.textContent.trim() === '专注') {
+            toggleModeButtonText.textContent = '自由';
+            chatMode = "free";
+            toggleModeButton.classList.remove('bg-blue-500');
+            toggleModeButton.classList.add('bg-gray-500');
+            fileUploadButton.style.display = 'none';
+        } else {
+            toggleModeButtonText.textContent = '专注';
+            chatMode = "focus";
+            toggleModeButton.classList.remove('bg-gray-500');
+            toggleModeButton.classList.add('bg-blue-500');
+            fileUploadButton.style.display = 'flex';
+        }
+    });
+
+    // 获取或创建 sessionId
+    let sessionId = sessionStorage.getItem('sessionId');
+    if (!sessionId) {
+        sessionId = 'session-' + Date.now();
+        sessionStorage.setItem('sessionId', sessionId);
+    }
+
+    // 当页面加载完毕时，加载聊天历史
+    window.addEventListener('DOMContentLoaded', (event) => {
+        const history = JSON.parse(sessionStorage.getItem(sessionId));
+        if (history) {
+            history.forEach(message => {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${message.sender}`;
+            const html = marked.parse(message.content);
+            messageElement.innerHTML = html;
+                chatWindow.appendChild(messageElement);
+            });
+        }
+    });
+
+    // 保存消息到聊天历史
+    function saveMessage(sender, content) {
+        let history = JSON.parse(sessionStorage.getItem(sessionId));
+        if (!history) {
+            history = [];
+        }
+        history.push({sender, content});
+        sessionStorage.setItem(sessionId, JSON.stringify(history));
+    }
+
+    // 添加点击事件监听器，用于重置聊天
+    resetButton.addEventListener('click', () => {
+        const oldSessionId = sessionStorage.getItem('sessionId');
+
+        sessionStorage.clear();
+
+        fileUploadButton.classList.remove('bg-gray-500');
+        fileUploadButton.classList.add('btn-primary');
+        fileInput.disabled = false;
+
+        while (chatWindow.firstChild) {
+            chatWindow.removeChild(chatWindow.firstChild);
+        }
+
+        fetch(`/reset-chat?sessionId=${oldSessionId}`)
+            .catch(error => {
+            });
+
+        sessionId = 'session-' + Date.now();
+        sessionStorage.setItem('sessionId', sessionId);
+    });
+
+    // 添加点击事件监听器，用于发送消息
+    submitButton.addEventListener('click', () => {
+        const inputValue = search.value.trim();
+        if (inputValue === '') {
+            return;
+        }
+
+        if (chatMode === 'focus' && !sessionStorage.getItem('fileUploaded')) {
+            Swal.fire("专注模式下，请先上传文档！");
+            return;
+        }
+
+        if (inputValue.length > 4096) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Oops...',
+                text: '输入的文字太多了！',
+            });
+            return;
+        }
+
+        // 保存用户消息
+        // 显示加载动画，隐藏提交文本
+        // 创建用户消息元素，添加到聊天窗口
+        // 创建 EventSource，用于接收服务器的响应
+        // 创建 AI 消息元素，添加到聊天窗口
+        // 监听服务器的消息，更新 AI 消息元素的内容
+        // 监听服务器的关闭和错误事件，保存 AI 消息，隐藏加载动画，显示提交文本
+        // 清空输入框
+        saveMessage('user', search.value);
+
+        loading.style.display = 'block';
+        submitText.style.display = 'none';
+
+        const userMessageElement = document.createElement('div');
+        userMessageElement.className = 'message user';
+        userMessageElement.textContent = search.value;
+        chatWindow.appendChild(userMessageElement);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+
+        const url = new URL('/chat-stream', window.location.origin);
+        url.searchParams.append('chatMode', chatMode);
+        url.searchParams.append('sessionId', sessionId);
+        url.searchParams.append('question', search.value);
+
+        const source = new EventSource(url);
+
+        const aiMessageElement = document.createElement('div');
+        aiMessageElement.className = 'message ai';
+        chatWindow.appendChild(aiMessageElement);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+
+        let aiResponse = '';
+
+        source.addEventListener('message', function(event) {
+            const data = JSON.parse(event.data);
+
+            aiResponse += data.msg;
+            aiMessageElement.innerHTML = '';
+            const html = marked.parse(aiResponse);
+            aiMessageElement.innerHTML = html;
+
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        });
+
+        source.addEventListener('close', function(error) {
+            saveMessage('ai', aiResponse);
+
+            source.close();
+            loading.style.display = 'none';
+            submitText.style.display = 'block';
+        });
+
+        source.addEventListener('error', function(error) {
+            saveMessage('ai', aiResponse);
+
+            source.close();
+            loading.style.display = 'none';
+            submitText.style.display = 'block';
+        });
+
+        search.value = '';
+    });
+
+    // 添加文件选择事件监听器，用于上传文件
+    const fileInput = document.getElementById('file-upload');
+    const uploadLoading = document.getElementById('upload-loading');
+    fileInput.addEventListener('change', function () {
+        const selectedFile = fileInput.files[0];
+        if (selectedFile) {
+            // 检查文件大小
+            const fileSize = selectedFile.size / 1024 / 1024;
+            if (fileSize > 15) {
+                Swal.fire({
+                  icon: "error",
+                  title: "Oops...",
+                  text: "文件大小超过15MB，请选择更小的文件！",
+                });
+                return;
+            }
+
+            uploadLoading.style.display = 'block';
+            const formData = new FormData();
+            formData.append('sessionId', sessionId);
+            formData.append('file', selectedFile);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData,
+            }).then(resultResponse => resultResponse.json()).then(data => {
+                uploadLoading.style.display = 'none';
+
+                if (data.code != 0) {
+                    Swal.fire({
+                      icon: "error",
+                      title: "Oops...",
+                      text: data.message,
+                    });
+                    return;
+                }
+
+                Swal.fire({
+                  icon: 'success',
+                  title: '上传成功！一起愉快的聊天吧！',
+                });
+
+                // 标记文件已上传，禁用文件上传按钮
+                sessionStorage.setItem('fileUploaded', 'true');
+
+                fileUploadButton.classList.add('bg-gray-500');
+                fileUploadButton.classList.remove('btn-primary');
+                fileInput.disabled = true;
+            }).catch(error => {
+                uploadLoading.style.display = 'none';
+                Swal.fire({
+                  icon: "error",
+                  title: "Oops...",
+                  text: "Something went wrong!",
+                });
+            });
+            fileInput.value = null;
+        }
+    });
+
+    // 添加键盘事件监听器，用于在按下 Enter 键时发送消息
+    search.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitButton.click();
+        }
+    });
+
+    // 添加点击事件监听器，用于在文件已上传时显示提示消息
+    fileUploadButton.addEventListener('click', () => {
+        if (sessionStorage.getItem('fileUploaded')) {
+            Swal.fire("点击重置后，可以重新上传文档！");
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const titleElement = document.querySelector('.title-text');
+        const originalText = "Talk Doc——基于文档的交谈式AI";
+        let currentIndex = 0;
+
+        const interval = setInterval(function() {
+            if (currentIndex <= originalText.length) {
+                titleElement.textContent = originalText.slice(0, currentIndex);
+                currentIndex++;
+            } else {
+                clearInterval(interval);
+            }
+        }, 100);
+    });
+
+</script>
+</body>
+</html>
